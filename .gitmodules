@@ -1,0 +1,3 @@
+[submodule "jpc-code"]
+	path = jpc-code
+	url = http://git.code.sf.net/p/jpc/code
