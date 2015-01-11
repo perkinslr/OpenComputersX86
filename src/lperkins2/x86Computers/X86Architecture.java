@@ -66,7 +66,7 @@ public class X86Architecture implements Architecture{
         vgaCard.resizeDisplay(320, 200);
         shouldCrash = false;
         String[] args = {
-                "-fda", "mem:resources/images/floppy.img", "-hda", "mem:resources/images/dosgames.img", "-boot", "fda"
+                "-fda", "mem:resources/images/floppy.img", "-hda", "mem:resources/images/floppy.img", "-boot", "hda"
         };
         drives = DriveSet.buildFromArgs(args);
         keyboard = new Keyboard();
@@ -80,7 +80,8 @@ public class X86Architecture implements Architecture{
             e.printStackTrace();
             return false;
         }
-        
+        recomputeMemory();
+        shouldCrash = false;
         initialized=true;
         return true;
     }
@@ -310,20 +311,22 @@ public class X86Architecture implements Architecture{
                     if (signal != null) {
                         X86OpenComputers.log.info("Signal: " + signal.name() + ", args: "+signal.args());
                         if (signal.name().equals("key_down")) {
-                            byte character = (byte) (double) (Double) signal.args()[1]; // castception
+                            byte character = (byte) (double) (Double) signal.args()[2]; // castception
                             if (character != 0) // Not a character
                                 if (keyboard.checkInitialised()){
-                                    keyboard.keyPressed(asciiCodeToScanScode(character, false));
+                                    keyboard.keyPressed(character);
+                                    //asciiCodeToScanScode(character, false));
                                 }
                                 else{
                                     X86OpenComputers.log.info("Keyboard not ready");
                                 }
                         }
                         else if (signal.name().equals("key_up")) {
-                            byte character = (byte) (double) (Double) signal.args()[1]; // castception
+                            byte character = (byte) (double) (Double) signal.args()[2]; // castception
                             if (character != 0) // Not a character
                                 if (keyboard.initialised()){
-                                    keyboard.keyReleased(asciiCodeToScanScode(character, true));
+                                    keyboard.keyReleased(character);
+                                    //keyboard.keyReleased(asciiCodeToScanScode(character, true));
                                 }
                                 else{
                                     X86OpenComputers.log.info("Keyboard not ready");

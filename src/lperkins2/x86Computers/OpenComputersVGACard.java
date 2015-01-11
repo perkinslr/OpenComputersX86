@@ -2,6 +2,7 @@ package lperkins2.x86Computers;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Image;
 
 import li.cil.oc.api.component.TextBuffer;
 
@@ -32,7 +33,6 @@ public class OpenComputersVGACard extends VGACard{
     private int[] rawImageData;
     private int xmin,  xmax,  ymin,  ymax,  width,  height;
     private BufferedImage buffer;
-    int renderingPass=0;
     OpenComputersX86Monitor monitor;
 
     public OpenComputersVGACard() 
@@ -174,24 +174,24 @@ public class OpenComputersVGACard extends VGACard{
                 if (host instanceof TextBuffer){
                     TextBuffer screen = (TextBuffer) host;
                     
-                    
-                    X86OpenComputers.log.info(""+screen.getMaximumWidth()+"x"+ screen.getMaximumHeight());
-                    screen.setMaximumResolution(width+1, height);
-                    screen.setResolution(width, height);
-                    screen.setRenderingEnabled(true);
+                    if (screen.getMaximumWidth() < width || screen.getMaximumHeight() < height/2){
+                        screen.setMaximumResolution(width, height/2);
+                        screen.setResolution(width, height/2);
+                        screen.setRenderingEnabled(true);
+                    }
                     
                     rawImageData = ((DataBufferInt) buffer.getRaster().getDataBuffer()).getData();
                     for (idx=0;idx<stop;idx++){
                         x=idx%this.width;
                         y=idx/this.width;
-                        if (x==0){
+                        if (y%2==0){
                             y++;
                             idx+=this.width;
                         }
-                        rgbColor = rawImageData[idx+width*renderingPass];
-                        rgbColor2 = rawImageData[idx+width+this.width*renderingPass];
-                        screen.setBackgroundColor(rgbColor);
-                        screen.setForegroundColor(rgbColor2);
+                        rgbColor = rawImageData[idx];
+                        rgbColor2 = rawImageData[idx-width];
+                        screen.setBackgroundColor(rgbColor2);
+                        screen.setForegroundColor(rgbColor);
                         screen.set(x, y, "\u2580", false);
                         
                     }
@@ -204,7 +204,7 @@ public class OpenComputersVGACard extends VGACard{
             }
             catch(Exception e) {
                 X86OpenComputers.log.info("Screen display had an error");
-                e.printStackTrace();
+                X86Architecture.joinStackTrace(e);
             }
             
             
@@ -219,10 +219,20 @@ public class OpenComputersVGACard extends VGACard{
             Environment host = machine.node().network().node(gpu_address).host();       
             if (host instanceof TileEntityGPU){
                 TileEntityGPU gpu = (TileEntityGPU) host;
-                Texture t = new Texture(this.width, this.height);
-                t.graphics.drawImage(buffer, 0, 0, width, height, new Color(0,0,0), (ImageObserver) null);
-                gpu.gpu.textures[42]=t;
                 
+                
+                
+                
+                
+                
+                int target_width = gpu.gpu.getMonitor().getWidth();
+                int target_height = gpu.gpu.getMonitor().getHeight();
+                Texture t = new Texture(target_width, target_height);
+                Image image = buffer.getScaledInstance(target_width, target_height, Image.SCALE_SMOOTH);
+                t.graphics.drawImage(image, 0, 0, target_width, target_width, new Color(0,0,0), (ImageObserver) null);
+                
+                
+                gpu.gpu.textures[42]=t;
                 
                 
                 
@@ -231,16 +241,17 @@ public class OpenComputersVGACard extends VGACard{
                 try
                 {
                     DrawCMD cmd = new DrawCMD();
-                    Object[] nargs = new Object[] { 0, 42, 0, 0 };
+                    Object[] nargs = new Object[] { 0, 42, 0, 0};
                     cmd.cmd = CommandEnum.DrawTexture;
                     cmd.args = nargs;
                     gpu.gpu.processCommand(cmd);
                     gpu.gpu.drawlist.push(cmd);
+                    gpu.gpu.processSendList();
                 }
                 catch (Exception e)
                 {
                     // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    X86Architecture.joinStackTrace(e);
                 }
                 
                 
