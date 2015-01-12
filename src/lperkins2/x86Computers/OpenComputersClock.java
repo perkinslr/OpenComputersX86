@@ -13,7 +13,16 @@ import org.jpc.j2se.VirtualClock;
 import org.jpc.support.Clock;
 
 public class OpenComputersClock extends VirtualClock{
-    public static final long IPS = Processor.IPS;
-    public static final long NSPI = 10*1000000000L/IPS; //Nano seconds per instruction
+    OpenComputersX86Processor proc;
+    public OpenComputersClock(){
+        
+    }
+    public OpenComputersClock(OpenComputersX86Processor proc){
+        this.proc=proc;
+        this.IPS = proc.IPS;
+        this.NSPI = 10*100000000L/this.IPS;
+    }
+    public long IPS; 
+    public long NSPI; 
     
 }

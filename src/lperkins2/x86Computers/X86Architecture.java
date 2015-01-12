@@ -66,13 +66,13 @@ public class X86Architecture implements Architecture{
         vgaCard.resizeDisplay(320, 200);
         shouldCrash = false;
         String[] args = {
-                "-fda", "mem:resources/images/floppy.img", "-hda", "mem:resources/images/floppy.img", "-boot", "hda"
+                "-fda", "resources/images/floppy.img", "-hda", "resources/images/floppy.img", "-boot", "cdrom", "-cdrom", "Downloads/super_grub2_disk_hybrid_2.00s1-beta6.iso", "-mhz", "75"
         };
         drives = DriveSet.buildFromArgs(args);
         keyboard = new Keyboard();
         try
         {
-            x86pc = new OpenComputersX86PC(new OpenComputersClock(), keyboard, drives, vgaCard);
+            x86pc = new OpenComputersX86PC(this.machine, new OpenComputersClock(), keyboard, drives, vgaCard);
         }
         catch (IOException e)
         {
@@ -340,9 +340,10 @@ public class X86Architecture implements Architecture{
                         break;
                 }
             }
-            
+            X86OpenComputers.log.info("Starting execute");
             x86pc.execute();
-            if (0==numberOfCalls%100){
+            X86OpenComputers.log.info("Ended execute");
+            if (0==numberOfCalls%1000){
                 return new ExecutionResult.SynchronizedCall();
             }
             return new ExecutionResult.Sleep(0);

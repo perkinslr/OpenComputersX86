@@ -23,6 +23,8 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import li.cil.oc.api.machine.Machine;
+
 import org.jpc.emulator.HardwareComponent;
 import org.jpc.emulator.PC;
 import org.jpc.emulator.memory.LinearAddressSpace;
@@ -68,21 +70,22 @@ public class OpenComputersX86PC{
     private Set<HardwareComponent> parts;
     private CodeBlockManager manager;
     private EthernetCard ethernet;
+    Machine machine;
     
     
     
-    
-    public OpenComputersX86PC(OpenComputersClock clock, Keyboard keyboard, DriveSet drives, OpenComputersVGACard vgaCard) throws IOException
+    public OpenComputersX86PC(Machine machine, OpenComputersClock clock, Keyboard keyboard, DriveSet drives, OpenComputersVGACard vgaCard) throws IOException
     {
         //super(clock, drives);
+        this.machine=machine;
         vgaCard.resizeDisplay(640,480);
-        this.vmClock=clock;
+        this.vmClock=new VirtualClock();
         parts = new HashSet<HardwareComponent>();
         parts.add(vmClock);
         processor = new OpenComputersX86Processor(vmClock);
         parts.add(processor);
         manager = new CodeBlockManager();
-        physicalAddr = new OpenComputersPhysicalAddressSpace(manager, this);
+        physicalAddr = new PhysicalAddressSpace(manager);
         parts.add(physicalAddr);
         linearAddr = new LinearAddressSpace();
         parts.add(linearAddr);
@@ -105,10 +108,10 @@ public class OpenComputersX86PC{
         vgaCard.setMonitor(new OpenComputersX86Monitor(this, vgaCard));
         parts.add(vgaCard);
 
-        parts.add(new SerialPort(0));
+        parts.add(new OpenComputersX86SerialPort(machine, 0));
         parts.add(keyboard);
         parts.add(new FloppyController());
-        //parts.add(new PCSpeaker());
+        parts.add(new PCSpeaker());
 
         //PCI Stuff
         parts.add(new PCIHostBridge());
@@ -118,7 +121,7 @@ public class OpenComputersX86PC{
         //BIOSes
         
         
-        parts.add(new SystemBIOS("/resources/bios/bios.bin"));
+        parts.add(new SystemBIOSX86(this, "/resources/bios/bios.bin"));
         parts.add(new VGABIOS("/resources/bios/vgabios.bin"));
 
         if (!configure()) {

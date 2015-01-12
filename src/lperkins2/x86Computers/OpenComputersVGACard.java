@@ -2,7 +2,9 @@ package lperkins2.x86Computers;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.RenderingHints;
 
 import li.cil.oc.api.component.TextBuffer;
 
@@ -11,8 +13,12 @@ import java.awt.image.BufferedImage;
 import java.awt.image.BufferedImageOp;
 import java.awt.image.DataBufferInt;
 import java.awt.image.ImageObserver;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
@@ -138,19 +144,35 @@ public class OpenComputersVGACard extends VGACard{
     public BufferedImage getImageData(){
         return buffer;
     }
-
+    private BufferedImage getScaledImage(Image srcImg, int w, int h){
+        BufferedImage resizedImg = new BufferedImage(w, h, BufferedImage.TRANSLUCENT);
+        Graphics2D g2 = resizedImg.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(srcImg, 0, 0, w, h, null);
+        g2.finalize();
+        g2.dispose();
+        return resizedImg;
+    }
     public void render(Machine machine)
     {
-        int stop = this.width*this.height;
         
-        int idx;
         
-        int x;
-        int y;
-        int rgbColor;
-        int rgbColor2;
         this.monitor.renderToScreen();
         saveScreenshot();
+        BufferedImage scaled = getScaledImage(buffer, this.width/2, this.height/2);
+        
+        File out = new File("Screenshot_Resized.png");
+        try
+        {
+            ImageIO.write(scaled, "png", out);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        
+        
+        
         
         Iterator<Entry<String, String>> components = (machine.components().entrySet().iterator());
         Entry<String, String> comp;
@@ -168,33 +190,17 @@ public class OpenComputersVGACard extends VGACard{
         }
         if (address!=null){
             try{
-                
-            
                 Environment host = machine.node().network().node(address).host();       
                 if (host instanceof TextBuffer){
                     TextBuffer screen = (TextBuffer) host;
                     
-                    if (screen.getMaximumWidth() < width || screen.getMaximumHeight() < height/2){
-                        screen.setMaximumResolution(width, height/2);
-                        screen.setResolution(width, height/2);
-                        screen.setRenderingEnabled(true);
-                    }
                     
-                    rawImageData = ((DataBufferInt) buffer.getRaster().getDataBuffer()).getData();
-                    for (idx=0;idx<stop;idx++){
-                        x=idx%this.width;
-                        y=idx/this.width;
-                        if (y%2==0){
-                            y++;
-                            idx+=this.width;
-                        }
-                        rgbColor = rawImageData[idx];
-                        rgbColor2 = rawImageData[idx-width];
-                        screen.setBackgroundColor(rgbColor2);
-                        screen.setForegroundColor(rgbColor);
-                        screen.set(x, y, "\u2580", false);
-                        
-                    }
+                    //renderImageToScreen(buffer, screen);
+                    
+                    
+                    
+                    
+                    
                     
                 }
                 else{
@@ -218,44 +224,7 @@ public class OpenComputersVGACard extends VGACard{
             X86OpenComputers.log.info("GPU found");
             Environment host = machine.node().network().node(gpu_address).host();       
             if (host instanceof TileEntityGPU){
-                TileEntityGPU gpu = (TileEntityGPU) host;
-                
-                
-                
-                
-                
-                
-                int target_width = gpu.gpu.getMonitor().getWidth();
-                int target_height = gpu.gpu.getMonitor().getHeight();
-                Texture t = new Texture(target_width, target_height);
-                Image image = buffer.getScaledInstance(target_width, target_height, Image.SCALE_SMOOTH);
-                t.graphics.drawImage(image, 0, 0, target_width, target_width, new Color(0,0,0), (ImageObserver) null);
-                
-                
-                gpu.gpu.textures[42]=t;
-                
-                
-                
-                
-
-                try
-                {
-                    DrawCMD cmd = new DrawCMD();
-                    Object[] nargs = new Object[] { 0, 42, 0, 0};
-                    cmd.cmd = CommandEnum.DrawTexture;
-                    cmd.args = nargs;
-                    gpu.gpu.processCommand(cmd);
-                    gpu.gpu.drawlist.push(cmd);
-                    gpu.gpu.processSendList();
-                }
-                catch (Exception e)
-                {
-                    // TODO Auto-generated catch block
-                    X86Architecture.joinStackTrace(e);
-                }
-                
-                
-                
+                renderImageToOpenComputerLights2(buffer, (TileEntityGPU) host);
             }
             else{
                 X86OpenComputers.log.info("GPU not castable!");
@@ -268,9 +237,134 @@ public class OpenComputersVGACard extends VGACard{
         
         
     }
+    
+    public void renderImageToScreen(BufferedImage img, TextBuffer screen){
+        int targetWidth = img.getWidth(null);
+        int targetHeight = img.getHeight(null);
+        if (screen.getMaximumWidth() < targetWidth || screen.getMaximumHeight() < targetHeight / 2){
+            screen.setMaximumResolution(targetWidth, targetHeight / 2);
+            screen.setResolution(targetWidth, targetHeight / 2);
+            screen.setRenderingEnabled(true);
+        }
+        int[] rawData = ((DataBufferInt) img.getRaster().getDataBuffer()).getData();
+        int idx;
+        
+        int x;
+        int y;
+        int rgbColor;
+        int rgbColor2;
+        for (idx=0;idx<targetWidth*targetHeight;idx++){
+            x=idx%(targetWidth);
+            if (x==0){
+                idx += this.width;
+            }
+            y=idx/(targetWidth);
+            rgbColor = rawData[idx];
+            rgbColor2 = rawData[idx-width];
+            screen.setBackgroundColor(rgbColor2);
+            screen.setForegroundColor(rgbColor);
+            screen.set(x, y, "\u2580", false);
+            
+        }
+        
+    }
+    
+    public void renderImageToOpenComputerLights2(Image img, TileEntityGPU gpu){
+        
+        int targetWidth = gpu.gpu.getMonitor().getWidth();
+        int targetHeight = gpu.gpu.getMonitor().getHeight();
+        ByteArrayOutputStream textureBuffer = new ByteArrayOutputStream();
+        try
+        {
+            ImageIO.write(buffer, "png", textureBuffer);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            return;
+        }
+        X86OpenComputers.log.info("Target width: "+targetWidth);
+        X86OpenComputers.log.info("Target height: "+targetHeight);
+        DrawCMD cmd = new DrawCMD();
+        
 
+        
+        
+        
+
+        
+        
+        Object[] nargs = new Object[] { toObjects(textureBuffer.toByteArray()) };
+        cmd.cmd = CommandEnum.Import;
+        cmd.args = nargs;
+        int texture = 1;
+        try
+        {
+            texture = (Integer) gpu.gpu.processCommand(cmd)[0];
+        }
+        catch (Exception e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return;
+        }
+        gpu.gpu.drawlist.push(cmd);
+        cmd = new DrawCMD();
+        nargs = new Object[] { 0, texture, 0, 0};
+        cmd.cmd = CommandEnum.DrawTexture;
+        cmd.args = nargs;
+        try
+        {
+            gpu.gpu.processCommand(cmd);
+        }
+        catch (Exception e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return;
+        }
+        
+        
+        
+        
+        gpu.gpu.drawlist.push(cmd);
+        
+        
+        cmd = new DrawCMD();
+        nargs = new Object[] { texture };
+        cmd.cmd = CommandEnum.FreeTexture;
+        cmd.args = nargs;
+        
+        
+        try
+        {
+            gpu.gpu.processCommand(cmd);
+        }
+        catch (Exception e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return;
+        }
+        
+        gpu.gpu.drawlist.push(cmd);
+        
+        
+        gpu.gpu.processSendList();
+        
+    }
+  //byte[] to Byte[]
+    Byte[] toObjects(byte[] bytesPrim) {
+
+        Byte[] bytes = new Byte[bytesPrim.length];
+        int i = 0;
+        for (byte b : bytesPrim) bytes[i++] = b; //Autoboxing
+        return bytes;
+
+    }
     public void paintPCMonitor(Graphics g, OpenComputersX86Monitor openComputersX86Monitor)
     {
+        
         g.drawImage(buffer, 0, 0, null);
         Dimension s = openComputersX86Monitor.getSize();
         g.setColor(Color.black);
