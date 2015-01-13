@@ -340,9 +340,14 @@ public class X86Architecture implements Architecture{
                         break;
                 }
             }
-            X86OpenComputers.log.info("Starting execute");
-            x86pc.execute();
-            X86OpenComputers.log.info("Ended execute");
+            //X86OpenComputers.log.info("Starting execute");
+            try{
+                x86pc.execute();
+            }
+            catch (EscapeContinuation c){
+                return new ExecutionResult.Sleep(0);
+            }
+            //X86OpenComputers.log.info("Ended execute");
             if (0==numberOfCalls%1000){
                 return new ExecutionResult.SynchronizedCall();
             }

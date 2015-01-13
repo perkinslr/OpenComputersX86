@@ -63,7 +63,7 @@ public class OpenComputersX86PC{
     public boolean compile = true;
     public int ramSize;
     private static Logger LOGGING = X86OpenComputers.log;
-    private Processor processor;
+    private OpenComputersX86Processor processor;
     private PhysicalAddressSpace physicalAddr;
     private LinearAddressSpace linearAddr;
     private Clock vmClock;
@@ -71,6 +71,7 @@ public class OpenComputersX86PC{
     private CodeBlockManager manager;
     private EthernetCard ethernet;
     Machine machine;
+    public boolean waitForInterrupt=false;
     
     
     
@@ -82,7 +83,7 @@ public class OpenComputersX86PC{
         this.vmClock=new VirtualClock();
         parts = new HashSet<HardwareComponent>();
         parts.add(vmClock);
-        processor = new OpenComputersX86Processor(vmClock);
+        processor = new OpenComputersX86Processor(this, vmClock);
         parts.add(processor);
         manager = new CodeBlockManager();
         physicalAddr = new PhysicalAddressSpace(manager);
@@ -355,7 +356,13 @@ public class OpenComputersX86PC{
      * never run indefinitely.
      * @return total number of x86 instructions executed.
      */
-    public final int execute() {
+    public final int execute() throws EscapeContinuation {
+        
+        if (waitForInterrupt){
+            if (!checkForInterrupt()){
+                return 0;
+            }
+        }
         
         if (processor.isProtectedMode()) {
             if (processor.isVirtual8086Mode()) {
@@ -368,6 +375,12 @@ public class OpenComputersX86PC{
         }
     }
 
+    private boolean checkForInterrupt()
+    {
+        return this.processor.checkForInterrupt();
+        
+    }
+
     public final int executeReal()
     {
         int x86Count = 0;
@@ -378,7 +391,16 @@ public class OpenComputersX86PC{
             for (int i = 0; i < 100; i++)
             {
                 ethernet.checkForPackets();
-                int block = physicalAddr.executeReal(processor, processor.getInstructionPointer());
+                int block;
+                try{
+                    block = physicalAddr.executeReal(processor, processor.getInstructionPointer());
+                }
+                catch (EscapeContinuation e){
+                    waitForInterrupt = true;
+                    x86Count += e.retval;
+                    clockx86Count += e.retval;
+                    return x86Count;
+                }
                 x86Count += block;
                 clockx86Count += block;
                 if (x86Count > nextClockCheck)
@@ -406,7 +428,8 @@ public class OpenComputersX86PC{
         {
             for (int i = 0; i < 100; i++)
             {
-                int block= linearAddr.executeProtected(processor, processor.getInstructionPointer());
+                int block;
+                block = physicalAddr.executeProtected(processor, processor.getInstructionPointer());
                 x86Count += block;
                 clockx86Count += block;
                 if (x86Count > nextClockCheck)
@@ -435,7 +458,8 @@ public class OpenComputersX86PC{
         {
             for (int i = 0; i < 100; i++)
             {
-                int block = linearAddr.executeVirtual8086(processor, processor.getInstructionPointer());
+                int block;
+                block = physicalAddr.executeVirtual8086(processor, processor.getInstructionPointer());
                 x86Count += block;
                 clockx86Count += block;
                 if (x86Count > nextClockCheck)

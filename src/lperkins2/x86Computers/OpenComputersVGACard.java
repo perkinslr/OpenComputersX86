@@ -269,14 +269,19 @@ public class OpenComputersVGACard extends VGACard{
         
     }
     
-    public void renderImageToOpenComputerLights2(Image img, TileEntityGPU gpu){
+    public void renderImageToOpenComputerLights2(BufferedImage img, TileEntityGPU gpu){
         
         int targetWidth = gpu.gpu.getMonitor().getWidth();
         int targetHeight = gpu.gpu.getMonitor().getHeight();
+        
+        BufferedImage scaled = getScaledImage(img, targetWidth, targetHeight);
+        
+        
+        
         ByteArrayOutputStream textureBuffer = new ByteArrayOutputStream();
         try
         {
-            ImageIO.write(buffer, "png", textureBuffer);
+            ImageIO.write(scaled, "png", textureBuffer);
         }
         catch (IOException e)
         {
@@ -285,6 +290,10 @@ public class OpenComputersVGACard extends VGACard{
         }
         X86OpenComputers.log.info("Target width: "+targetWidth);
         X86OpenComputers.log.info("Target height: "+targetHeight);
+        
+        
+        
+        
         DrawCMD cmd = new DrawCMD();
         
 
