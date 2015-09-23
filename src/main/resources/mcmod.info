@@ -1,0 +1,17 @@
+[
+  {
+    "modid": "OCx86",
+    "name": "OpenComputers x86",
+    "description": "x86 arch for opencomputers",
+	"version": "${version}",
+	"mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["lperkins2"],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "parent":"",
+    "dependencies": []
+  }
+]
